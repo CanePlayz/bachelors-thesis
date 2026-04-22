@@ -72,18 +72,11 @@ def save_results(
         "n_converged": mg.n_converged,
         "exog_names": mg.exog_names,
         # Coefficients, SE, t-stats, p-values — keyed by variable name
-        # (uses simple MG as the primary estimator)
+        # (equal-weighted Mean Group, Pesaran & Smith 1995)
         "coefficients": {name: float(mg.delta_mg[name]) for name in mg.exog_names},
         "std_errors": {name: float(mg.se_mg[name]) for name in mg.exog_names},
         "t_stats": {name: float(mg.t_mg[name]) for name in mg.exog_names},
         "p_values": {name: float(mg.p_mg[name]) for name in mg.exog_names},
-        # Sample-weighted alternative
-        "sample_weighted": {
-            "coefficients": {name: float(mg.delta_sw[name]) for name in mg.exog_names},
-            "std_errors": {name: float(mg.se_sw[name]) for name in mg.exog_names},
-            "t_stats": {name: float(mg.t_sw[name]) for name in mg.exog_names},
-            "p_values": {name: float(mg.p_sw[name]) for name in mg.exog_names},
-        },
         # Cross-sectional distribution of per-stock estimates
         "distribution": {
             name: {
@@ -144,38 +137,31 @@ def _write_latex_table(mg: MeanGroupResult, path: Path) -> None:
         r"\begin{threeparttable}",
         r"\caption{Mean Group Estimates: Social Media Effects on Volatility}",
         r"\label{tab:garch_mg}",
-        r"\begin{tabular}{lcc}",
+        r"\begin{tabular}{lc}",
         r"\toprule",
-        r" & Simple MG & Sample-Weighted \\",
+        r" & Mean Group \\",
         r"\midrule",
     ]
 
     for name in mg.exog_names:
         label = _label(name)
         # Coefficient row
-        vals = []
-        for d, pv in [(mg.delta_mg, mg.p_mg), (mg.delta_sw, mg.p_sw)]:
-            vals.append(f"${d[name]:.6f}{stars(pv[name])}$")
-        lines.append(f"  {label} & " + " & ".join(vals) + r" \\")
-
+        lines.append(
+            f"  {label} & ${mg.delta_mg[name]:.6f}{stars(mg.p_mg[name])}$ \\\\"
+        )
         # SE row
-        se_vals = []
-        for s in [mg.se_mg, mg.se_sw]:
-            se_vals.append(f"$({s[name]:.6f})$")
-        lines.append(f"  & " + " & ".join(se_vals) + r" \\[0.5em]")
+        lines.append(f"  & $({mg.se_mg[name]:.6f})$ \\\\[0.5em]")
 
     lines.extend(
         [
             r"\midrule",
-            f"  Stocks & \\multicolumn{{2}}{{c}}{{{mg.n_stocks}}} \\\\",
-            f"  Converged & \\multicolumn{{2}}{{c}}{{{mg.n_converged}}} \\\\",
+            f"  Stocks & {mg.n_stocks} \\\\",
+            f"  Converged & {mg.n_converged} \\\\",
             r"\bottomrule",
             r"\end{tabular}",
             r"\begin{tablenotes}",
             r"\footnotesize",
-            r"\item \textit{Notes:} Clustered standard errors in parentheses.",
-            r"\item Simple MG uses cross-sectional variance (Pesaran \& Smith, 1995).",
-            r"\item Sample-Weighted uses $T_i / \sum T_j$ as weights.",
+            r"\item \textit{Notes:} Cross-sectional standard errors in parentheses (Pesaran \& Smith, 1995).",
             r"\item $^{***}p<0.001$, $^{**}p<0.01$, $^{*}p<0.05$, $^{\cdot}p<0.1$",
             r"\end{tablenotes}",
             r"\end{threeparttable}",

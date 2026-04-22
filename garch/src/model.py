@@ -101,12 +101,6 @@ class MeanGroupResult:
     t_mg: Dict[str, float]
     p_mg: Dict[str, float]
 
-    # Sample-size weighted MG
-    delta_sw: Dict[str, float]
-    se_sw: Dict[str, float]
-    t_sw: Dict[str, float]
-    p_sw: Dict[str, float]
-
     n_stocks: int
     n_converged: int
 
@@ -120,21 +114,11 @@ def mean_group_aggregate(
     results: List[StockResult],
     only_converged: bool = True,
 ) -> MeanGroupResult:
-    """Compute Mean Group estimators for delta across stocks.
+    """Compute the (equal-weighted) Mean Group estimator for delta across stocks.
 
-    Two weighting schemes:
-    1. Simple MG: equal weights (Pesaran, 1995)
-    2. Sample-size weighted (SW): weight_i = T_i / sum(T_j)
-
-    Standard errors for the simple MG use the cross-sectional variance:
+    Follows Pesaran & Smith (1995): each stock contributes equally,
+    standard errors are based on the cross-sectional variance:
         SE(delta_MG) = (1/sqrt(N)) * sqrt( (1/(N-1)) * sum( (delta_i - delta_MG)^2 ) )
-
-    Note: Inverse-variance weighting (IVW / DerSimonian-Laird) is not used
-    because the per-stock delta SEs are 1000x larger than the effects
-    themselves (0% individually significant), making IVW weights
-    uninformative.  The MG estimator correctly identifies the aggregate
-    effect via cross-sectional averaging even when individual estimates
-    are noisy (Pesaran, 1995).
     """
     from scipy import stats as sp_stats
 
@@ -148,7 +132,6 @@ def mean_group_aggregate(
     # Collect per-stock arrays
     deltas: Dict[str, np.ndarray] = {}
     ses: Dict[str, np.ndarray] = {}
-    nobs = np.array([r.n_obs for r in pool], dtype=np.float64)
 
     for name in exog_names:
         d = np.array([r.delta[name] for r in pool])
@@ -157,7 +140,6 @@ def mean_group_aggregate(
         ses[name] = s
 
     delta_mg, se_mg, t_mg, p_mg = {}, {}, {}, {}
-    delta_sw, se_sw, t_sw, p_sw = {}, {}, {}, {}
     delta_quantiles = {}
     delta_frac_pos = {}
     delta_frac_sig = {}
@@ -170,18 +152,17 @@ def mean_group_aggregate(
         valid = np.isfinite(d)
         dv = d[valid]
         sv = s[valid]
-        nv = nobs[valid]
         Nv = len(dv)
 
         if Nv < 2:
-            for dct in [delta_mg, se_mg, t_mg, p_mg, delta_sw, se_sw, t_sw, p_sw]:
+            for dct in [delta_mg, se_mg, t_mg, p_mg]:
                 dct[name] = np.nan
             delta_quantiles[name] = {}
             delta_frac_pos[name] = np.nan
             delta_frac_sig[name] = np.nan
             continue
 
-        # --- 1. Simple MG ---
+        # --- Simple MG ---
         mg = np.mean(dv)
         mg_se = np.std(dv, ddof=1) / np.sqrt(Nv)
         mg_t = mg / mg_se if mg_se > 0 else 0.0
@@ -190,19 +171,6 @@ def mean_group_aggregate(
         se_mg[name] = mg_se
         t_mg[name] = mg_t
         p_mg[name] = mg_p
-
-        # --- 2. Sample-size weighted ---
-        w_n = nv / np.sum(nv)
-        sw_mean = np.sum(w_n * dv)
-        # Weighted variance: sum(w_i * (d_i - d_bar)^2) / (1 - sum(w_i^2))
-        sw_var = np.sum(w_n * (dv - sw_mean) ** 2) / (1 - np.sum(w_n**2))
-        sw_se_val = np.sqrt(sw_var / Nv)
-        sw_t_val = sw_mean / sw_se_val if sw_se_val > 0 else 0.0
-        sw_p_val = 2 * (1 - sp_stats.t.cdf(abs(sw_t_val), df=Nv - 1))
-        delta_sw[name] = sw_mean
-        se_sw[name] = sw_se_val
-        t_sw[name] = sw_t_val
-        p_sw[name] = sw_p_val
 
         # --- Distribution ---
         delta_quantiles[name] = {
@@ -232,10 +200,6 @@ def mean_group_aggregate(
         se_mg=se_mg,
         t_mg=t_mg,
         p_mg=p_mg,
-        delta_sw=delta_sw,
-        se_sw=se_sw,
-        t_sw=t_sw,
-        p_sw=p_sw,
         n_stocks=N,
         n_converged=sum(1 for r in pool if r.converged),
         delta_quantiles=delta_quantiles,
@@ -267,7 +231,7 @@ def print_mean_group_table(mg: MeanGroupResult) -> None:
     print(f"{'='*90}")
 
     # Simple MG
-    print(f"\n  1) Simple Mean Group (Pesaran, 1995):")
+    print(f"\n  Simple Mean Group (Pesaran, 1995):")
     print(f"  {'Variable':<28s} {'delta':>12s} {'SE':>12s} {'t':>8s} {'p':>10s}")
     print(f"  {'-'*74}")
     for name in mg.exog_names:
@@ -277,19 +241,6 @@ def print_mean_group_table(mg: MeanGroupResult) -> None:
             f"{mg.se_mg[name]:>12.6f} "
             f"{mg.t_mg[name]:>8.3f} "
             f"{mg.p_mg[name]:>10.4e} {stars(mg.p_mg[name])}"
-        )
-
-    # Sample-size weighted
-    print(f"\n  2) Sample-Size Weighted:")
-    print(f"  {'Variable':<28s} {'delta':>12s} {'SE':>12s} {'t':>8s} {'p':>10s}")
-    print(f"  {'-'*74}")
-    for name in mg.exog_names:
-        print(
-            f"  {name:<28s} "
-            f"{mg.delta_sw[name]:>12.6f} "
-            f"{mg.se_sw[name]:>12.6f} "
-            f"{mg.t_sw[name]:>8.3f} "
-            f"{mg.p_sw[name]:>10.4e} {stars(mg.p_sw[name])}"
         )
 
     # Distribution

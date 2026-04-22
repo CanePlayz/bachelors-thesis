@@ -115,7 +115,7 @@ out/
 └── garch/
     ├── <run-name>/
     │   ├── stock_garch_results.csv / .parquet     Per-stock parameter estimates
-    │   ├── mean_group_results.json                MG and sample-weighted aggregates
+    │   ├── mean_group_results.json                MG aggregates and per-stock distribution
     │   └── mean_group_table.tex                   LaTeX MG estimates
     └── lr_tests/                                  Likelihood-ratio test outputs
 ```

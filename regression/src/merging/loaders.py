@@ -19,8 +19,7 @@ from typing import Set, Tuple
 
 import numpy as np
 import pandas as pd
-from config import (BENCHMARK_CSV, RETURNS_PARQUET, SENTIMENT_CSV,
-                    RegressionConfig)
+from config import BENCHMARK_CSV, RETURNS_PARQUET, SENTIMENT_CSV, RegressionConfig
 
 
 def load_returns_data(
@@ -107,6 +106,7 @@ def load_benchmark_data(config: RegressionConfig) -> pd.DataFrame:
 def load_sentiment_data(
     config: RegressionConfig,
     model: str | None = None,
+    indent: str = "",
 ) -> pd.DataFrame:
     """Load sentiment data from Reddit pipeline.
 
@@ -122,14 +122,14 @@ def load_sentiment_data(
         print("Run the Reddit pipeline first to generate sentiment data.")
         sys.exit(1)
 
-    print(f"Loading sentiment data: {SENTIMENT_CSV.name}")
+    print(f"{indent}Loading sentiment data: {SENTIMENT_CSV.name}")
 
     df = pd.read_csv(SENTIMENT_CSV)
 
     # Filter by model if specified
     if model:
         df = df[df["model"] == model]
-        print(f"  → Filtered to model: {model}")
+        print(f"{indent}  → Filtered to model: {model}")
 
     # Apply date filter
     if config.sample.start_date:
@@ -137,10 +137,10 @@ def load_sentiment_data(
     if config.sample.end_date:
         df = df[df["date"] <= config.sample.end_date]
 
-    print(f"  → {len(df):,} rows, {df['ticker'].nunique():,} tickers")
+    print(f"{indent}  → {len(df):,} rows, {df['ticker'].nunique():,} tickers")
     if "model" in df.columns:
-        print(f"  → Models: {sorted(df['model'].unique())}")
-    print(f"  → Date range: {df['date'].min()} to {df['date'].max()}")
+        print(f"{indent}  → Models: {sorted(df['model'].unique())}")
+    print(f"{indent}  → Date range: {df['date'].min()} to {df['date'].max()}")
 
     return df
 
@@ -169,6 +169,7 @@ def map_calendar_to_trading_day(
     df: pd.DataFrame,
     trading_calendar: pd.DataFrame,
     date_col: str = "date",
+    indent: str = "",
 ) -> pd.DataFrame:
     """Map calendar dates to trading days (backward aggregation).
 
@@ -222,7 +223,7 @@ def map_calendar_to_trading_day(
     # Drop rows that couldn't be mapped (beyond data range)
     n_unmapped = df["trading_date"].isna().sum()
     if n_unmapped > 0:
-        print(f"  → Dropped {n_unmapped} rows beyond trading calendar range")
+        print(f"{indent}  → Dropped {n_unmapped} rows beyond trading calendar range")
         df = df.dropna(subset=["trading_date"])
 
     return df

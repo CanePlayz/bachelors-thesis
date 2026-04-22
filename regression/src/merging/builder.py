@@ -20,14 +20,24 @@ from typing import Tuple
 import pandas as pd
 from config import OUTPUT_DIR, RegressionConfig
 
-from .features import (compute_attention_variables, compute_interaction_terms,
-                       compute_lagged_controls, compute_lagged_predictors,
-                       compute_rolling_volatility, compute_sentiment_variables,
-                       standardize)
+from .features import (
+    compute_attention_variables,
+    compute_interaction_terms,
+    compute_lagged_controls,
+    compute_lagged_predictors,
+    compute_rolling_volatility,
+    compute_sentiment_variables,
+    standardize,
+)
 from .io import load_panel_data, panel_is_stale, save_panel
-from .loaders import (filter_stocks_by_criteria, get_trading_calendar,
-                      load_benchmark_data, load_returns_data,
-                      load_sentiment_data, map_calendar_to_trading_day)
+from .loaders import (
+    filter_stocks_by_criteria,
+    get_trading_calendar,
+    load_benchmark_data,
+    load_returns_data,
+    load_sentiment_data,
+    map_calendar_to_trading_day,
+)
 
 
 def panel_exists(output_dir: Path | None = None) -> bool:
@@ -382,9 +392,9 @@ def _compute_robustness_columns(
         valid = (panel[mc_col] >= min_posts).astype(int)
         sent = np.where(valid == 1, panel[sa_col], 0.0)
 
-        # Positive / negative split
+        # Positive / negative split (non-negative intensities)
         sent_pos = np.maximum(sent, 0.0)
-        sent_neg = np.minimum(sent, 0.0)
+        sent_neg = np.maximum(-sent, 0.0)
 
         # Standardize (match primary model's standardization scope)
         std_scope = config.sentiment.standardization

@@ -898,13 +898,14 @@ def _optimize_stock_block(
             )
             theta_new[stock_idx[0]] = res.x  # type: ignore[union-attr]
         else:
-            # Low maxiter because outer BCD loop handles convergence
+            # maxiter chosen to allow inner solve to make meaningful
+            # progress on all directions (notably beta) per BCD round.
             res = optimize.minimize(
                 obj,
                 x0,
                 method="L-BFGS-B",
                 bounds=sub_bounds,
-                options={"maxiter": 10, "ftol": 1e-10},
+                options={"maxiter": 100, "ftol": 1e-10},
             )
             theta_new[stock_idx] = res.x
 

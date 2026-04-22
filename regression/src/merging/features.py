@@ -158,8 +158,8 @@ def compute_sentiment_variables(
     Returns:
         DataFrame with added sentiment columns:
         - sentiment: Adjusted sentiment (0 for low-volume days)
-        - sentiment_pos: Positive component max(S, 0)
-        - sentiment_neg: Negative component min(S, 0)
+        - sentiment_pos: Positive intensity max(S, 0)
+        - sentiment_neg: Negative intensity max(-S, 0)
         - sentiment_pos_std, sentiment_neg_std: Standardized versions
         - valid_sentiment: 1 if mention_count >= threshold
         - sentiment_disp: Dispersion (if available)
@@ -200,8 +200,10 @@ def compute_sentiment_variables(
         df["sentiment_std"] = standardize(df["sentiment"], scope="global")
 
     # Positive/negative split (needed for baseline)
+    # Both components are non-negative intensities (Tetlock 2007;
+    # Loughran & McDonald 2011 convention).
     df["sentiment_pos"] = np.maximum(df["sentiment"], 0.0)
-    df["sentiment_neg"] = np.minimum(df["sentiment"], 0.0)
+    df["sentiment_neg"] = np.maximum(-df["sentiment"], 0.0)
 
     if std_scope == "within_stock":
         df["sentiment_pos_std"] = standardize(

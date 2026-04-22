@@ -16,13 +16,20 @@ from typing import Dict, List, Literal
 
 import numpy as np
 import pandas as pd
-from config import (ATTENTION_ROBUSTNESS_SPECS, OUTPUT_DIR, AttentionConfig,
-                    RegressionConfig)
+from config import (
+    ATTENTION_ROBUSTNESS_SPECS,
+    OUTPUT_DIR,
+    AttentionConfig,
+    RegressionConfig,
+)
 
 from .estimation import run_panel_regression
-from .specs import (RegressionResult, RegressionSpec,
-                    create_baseline_volatility_spec,
-                    create_extension_volatility_spec)
+from .specs import (
+    RegressionResult,
+    RegressionSpec,
+    create_baseline_volatility_spec,
+    create_extension_volatility_spec,
+)
 
 
 def run_all_regressions(
@@ -221,10 +228,12 @@ def run_robustness_sentiment(
     Returns:
         Dictionary with robustness results keyed by model
     """
-    from merging.features import (compute_interaction_terms,
-                                  compute_sentiment_variables, standardize)
-    from merging.loaders import (load_sentiment_data,
-                                 map_calendar_to_trading_day)
+    from merging.features import (
+        compute_interaction_terms,
+        compute_sentiment_variables,
+        standardize,
+    )
+    from merging.loaders import load_sentiment_data, map_calendar_to_trading_day
 
     results = {}
 
@@ -238,7 +247,7 @@ def run_robustness_sentiment(
         print(f"    Loading sentiment data for {model}...")
 
         # Load sentiment data for this model
-        sentiment_df = load_sentiment_data(config, model=model)
+        sentiment_df = load_sentiment_data(config, model=model, indent="    ")
 
         # Get trading calendar from panel dates
         trading_calendar = pd.DataFrame({"date": sorted(panel["date"].unique())})
@@ -248,6 +257,7 @@ def run_robustness_sentiment(
             sentiment_df,
             trading_calendar,
             date_col="date",
+            indent="    ",
         )
 
         # Aggregate sentiment to trading day level
@@ -358,9 +368,11 @@ def run_robustness_attention(
     Returns:
         Dictionary with robustness results keyed by attention spec
     """
-    from merging.features import (compute_attention_variables,
-                                  compute_interaction_terms,
-                                  compute_lagged_predictors)
+    from merging.features import (
+        compute_attention_variables,
+        compute_interaction_terms,
+        compute_lagged_predictors,
+    )
 
     results = {}
 
@@ -549,8 +561,10 @@ def _create_model_panel(
         panel["sentiment_std"] = standardize(panel["sentiment"], scope="global")
 
     # Positive/negative split
+    # Both components are non-negative intensities (Tetlock 2007;
+    # Loughran & McDonald 2011 convention).
     panel["sentiment_pos"] = np.maximum(panel["sentiment"], 0.0)
-    panel["sentiment_neg"] = np.minimum(panel["sentiment"], 0.0)
+    panel["sentiment_neg"] = np.maximum(-panel["sentiment"], 0.0)
 
     if std_scope == "within_stock":
         panel["sentiment_pos_std"] = standardize(

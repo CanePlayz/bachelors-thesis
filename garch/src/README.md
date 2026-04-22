@@ -17,9 +17,8 @@ $$r_{i,t} = \mu_i + \varepsilon_{i,t}, \qquad
 
 Estimation is done one stock at a time via Gaussian quasi-maximum likelihood
 (`arch` package, L-BFGS-B). The cross-sectional average of the per-stock
-$\boldsymbol{\delta}_i$ estimates is the Mean-Group estimator; standard errors
-follow Pesaran & Smith (1995) and a sample-weighted variant is reported
-alongside.
+$\boldsymbol{\delta}_i$ estimates is the Mean-Group estimator with
+standard errors based on the cross-sectional variance (Pesaran & Smith, 1995).
 
 ## Files
 
@@ -64,7 +63,7 @@ Exactly the two GARCH-side robustness families discussed in §6 of the thesis:
 Per run, under `out/garch/<run-name>/`:
 
 - `stock_garch_results.csv` / `.parquet` — per-stock parameter estimates.
-- `mean_group_results.json` — MG and sample-weighted aggregates.
+- `mean_group_results.json` — MG aggregates and per-stock distribution.
 - `mean_group_table.tex` — LaTeX table of MG estimates.
 
 LR-test outputs are written under `out/garch/lr_tests/`.
