@@ -93,6 +93,10 @@ Outputs land under each module's `out/` directory (gitignored).
 - **Ticker universe:** NASDAQ and NYSE listings, see
   `reddit/tickers/clean_tickers.csv`.
 
+## Disclaimer about AI usage
+
+The codebase was developed with the assistance of GitHub Copilot, using the Claude Opus models. All code was reviewed and tested by the author.
+
 ## License
 
 MIT — see [LICENSE](LICENSE).
