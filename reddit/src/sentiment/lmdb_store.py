@@ -14,8 +14,6 @@ from __future__ import annotations
 
 import hashlib
 import os
-import struct
-from collections import defaultdict
 from typing import Dict, Iterator, List, Optional, Set, Tuple
 
 import lmdb
@@ -162,7 +160,6 @@ class LMDBScoreStore:
         """Grow the map size by MAP_SIZE_INCREMENT when database is full."""
         if not self._env:
             return
-        old_size = self._map_size
         self._map_size += MAP_SIZE_INCREMENT
         # Close and reopen with new size
         self._env.sync()
@@ -175,9 +172,6 @@ class LMDBScoreStore:
             sync=False,
             readonly=False,
         )
-        """ print(
-            f"[LMDB] Grew map size: {old_size / (1024**3):.1f}GB → {self._map_size / (1024**3):.1f}GB"
-        ) """
 
     def add_non_targeted(self, items: List[Tuple[str, str, float, str]]) -> None:
         """Add non-targeted scores: [(text, model_key, score, label), ...]"""

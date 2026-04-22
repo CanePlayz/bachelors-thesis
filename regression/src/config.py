@@ -179,10 +179,12 @@ class EstimationConfig:
     """
 
     # Fixed effects specification
+    # "none": Pooled OLS (no fixed effects) — useful to quantify how much
+    #         of R² is absorbed by the FE structure
     # "entity": Stock fixed effects only (alpha_i)
     # "time": Date fixed effects only (delta_t)
     # "twoway": Both entity and time fixed effects
-    fixed_effects: Literal["entity", "time", "twoway"] = "twoway"
+    fixed_effects: Literal["none", "entity", "time", "twoway"] = "twoway"
 
     # Standard error clustering
     # "entity": Cluster by stock

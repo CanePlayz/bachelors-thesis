@@ -75,9 +75,10 @@ Output:
     )
     parser.add_argument(
         "--fixed-effects",
-        choices=["entity", "time", "twoway"],
+        choices=["none", "entity", "time", "twoway"],
         default=DEFAULT_CONFIG.estimation.fixed_effects,
-        help=f"Fixed effects type (default: {DEFAULT_CONFIG.estimation.fixed_effects})",
+        help=f"Fixed effects type (default: {DEFAULT_CONFIG.estimation.fixed_effects}). "
+        f"Use 'none' for pooled OLS to quantify R² absorbed by FE.",
     )
     parser.add_argument(
         "--cluster",
