@@ -1,12 +1,15 @@
-"""Panel regression estimation using pyfixest and linearmodels.
+"""Panel regression estimation using pyfixest.
 
 This module implements panel OLS estimation with:
 - Entity (stock) fixed effects
-- Time (date) fixed effects
+- Time (date) fixed effects (or none, for pooled OLS)
 - Clustered standard errors (entity, time, or two-way)
 
-Uses pyfixest for efficient two-way fixed effects (iterative demeaning),
-falling back to linearmodels.PanelOLS for single-dimension FE.
+All specifications are routed through pyfixest, which uses iterative
+alternating projections (Gauss-Seidel demeaning) for high-dimensional
+fixed effects and falls back to plain OLS when no FEs are specified.
+Using a single backend keeps the reported R² and within-R² definitions
+consistent across pooled, one-way, and two-way specifications.
 """
 
 from __future__ import annotations
@@ -15,8 +18,6 @@ from typing import Optional
 
 import numpy as np
 import pandas as pd
-import pyfixest
-from linearmodels.panel import PanelOLS
 from pyfixest import feols as feols  # type: ignore[attr-defined]
 
 from .specs import RegressionResult, RegressionSpec
@@ -27,10 +28,7 @@ def run_panel_regression(
     spec: RegressionSpec,
     verbose: bool = True,
 ) -> RegressionResult:
-    """Run a panel regression with fixed effects.
-
-    Uses pyfixest for two-way FE (much more memory-efficient),
-    linearmodels for single-dimension FE.
+    """Run a panel regression (pyfixest backend, with or without FE).
 
     Args:
         df: Panel DataFrame with columns for target, regressors, ticker, date
@@ -71,19 +69,7 @@ def run_panel_regression(
             print(f"    WARNING: No valid observations for {spec.name}")
         return _empty_result(spec)
 
-    # -------------------------------------------------------------------------
-    # Choose estimation backend
-    # -------------------------------------------------------------------------
-
-    entity_effects = spec.entity_effects
-    time_effects = spec.time_effects
-    use_twoway = entity_effects and time_effects
-
-    # Use pyfixest for two-way FE (memory-efficient)
-    if use_twoway:
-        return _run_pyfixest(work_df, spec, verbose)
-    else:
-        return _run_linearmodels(work_df, spec, verbose)
+    return _run_pyfixest(work_df, spec, verbose)
 
 
 def _run_pyfixest(
@@ -151,7 +137,16 @@ def _run_pyfixest(
 
     # Model statistics (pyfixest uses underscore-prefixed attributes)
     result.r_squared = float(fitted._r2)  # type: ignore[union-attr]
-    result.r_squared_within = float(fitted._r2_within)  # type: ignore[union-attr]
+    # within-R² is only defined when at least one FE is absorbed; for
+    # pure pooled OLS we set it equal to the total R² for backward
+    # compatibility with downstream tables.
+    if fe_parts:
+        try:
+            result.r_squared_within = float(fitted._r2_within)  # type: ignore[union-attr]
+        except (AttributeError, TypeError):
+            result.r_squared_within = result.r_squared
+    else:
+        result.r_squared_within = result.r_squared
     result.n_obs = int(fitted._N)  # type: ignore[union-attr]
     result.n_entities = work_df["ticker"].nunique()
     result.n_time = work_df["date"].nunique()
@@ -170,125 +165,6 @@ def _run_pyfixest(
         "time_effects": spec.time_effects,
         "cluster": spec.cluster,
         "backend": "pyfixest",
-    }
-
-    if verbose:
-        n_sig = sum(1 for p in result.p_values.values() if p < 0.05)
-        print(
-            f"    → n={result.n_obs:,}, R²={result.r_squared:.4f}, "
-            f"within-R²={result.r_squared_within:.4f}, {n_sig}/{len(spec.regressors)} sig."
-        )
-
-    return result
-
-
-def _run_linearmodels(
-    work_df: pd.DataFrame,
-    spec: RegressionSpec,
-    verbose: bool,
-) -> RegressionResult:
-    """Run regression using linearmodels.PanelOLS.
-
-    Better for single-dimension FE; may run out of memory with two-way FE
-    on large datasets.
-    """
-
-    entity_effects = spec.entity_effects
-    time_effects = spec.time_effects
-
-    # Set up MultiIndex for panel data (entity, time)
-    work_df = work_df.set_index(["ticker", "date"])
-
-    # Separate dependent and independent variables
-    y = work_df[spec.target]
-    X = work_df[spec.regressors]
-
-    try:
-        model = PanelOLS(
-            dependent=y,
-            exog=X,
-            entity_effects=entity_effects,
-            time_effects=time_effects,
-            drop_absorbed=True,
-            check_rank=False,
-        )
-
-        # Fit with clustered standard errors
-        if spec.cluster == "twoway":
-            fitted = model.fit(
-                cov_type="clustered", cluster_entity=True, cluster_time=True
-            )
-        elif spec.cluster == "time":
-            fitted = model.fit(cov_type="clustered", cluster_time=True)
-        else:
-            fitted = model.fit(cov_type="clustered", cluster_entity=True)
-
-    except MemoryError:
-        if verbose:
-            print(
-                f"    ERROR: Out of memory. Install pyfixest for efficient two-way FE:"
-            )
-            print(f"      pip install pyfixest")
-        return _empty_result(spec, error="MemoryError: install pyfixest for two-way FE")
-
-    except Exception as e:
-        if verbose:
-            print(f"    ERROR in estimation: {e}")
-        return _empty_result(spec, error=str(e))
-
-    # -------------------------------------------------------------------------
-    # Extract results
-    # -------------------------------------------------------------------------
-
-    result = RegressionResult(spec)  # type: ignore[call-arg]
-
-    # Coefficients and statistics
-    for var in spec.regressors:
-        if var in fitted.params.index:
-            result.coefficients[var] = float(fitted.params[var])
-            result.std_errors[var] = float(fitted.std_errors[var])
-            result.t_stats[var] = float(fitted.tstats[var])
-            result.p_values[var] = float(fitted.pvalues[var])
-
-            # Confidence intervals
-            ci = fitted.conf_int()
-            if var in ci.index:
-                lower_val: float = ci.loc[var, "lower"]  # type: ignore[assignment]
-                upper_val: float = ci.loc[var, "upper"]  # type: ignore[assignment]
-                result.conf_int_lower[var] = lower_val
-                result.conf_int_upper[var] = upper_val
-
-    # Model statistics
-    result.r_squared = float(fitted.rsquared)
-    result.r_squared_within = (
-        float(fitted.rsquared_within)
-        if hasattr(fitted, "rsquared_within")
-        else result.r_squared
-    )
-    result.n_obs = int(fitted.nobs)
-    result.n_entities = (
-        int(fitted.entity_info["total"])
-        if hasattr(fitted, "entity_info")
-        else len(work_df.index.get_level_values(0).unique())
-    )
-    result.n_time = len(work_df.index.get_level_values(1).unique())
-
-    # F-test for joint significance
-    try:
-        f_test = fitted.f_statistic
-        result.f_stat = float(f_test.stat)
-        result.f_pvalue = float(f_test.pval)
-    except Exception:
-        result.f_stat = 0.0
-        result.f_pvalue = 1.0
-
-    # Additional model info
-    result.model_info = {
-        "entity_effects": entity_effects,
-        "time_effects": time_effects,
-        "cluster": spec.cluster,
-        "cov_type": getattr(fitted, "cov_type", "clustered"),
-        "backend": "linearmodels",
     }
 
     if verbose:

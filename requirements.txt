@@ -1,6 +1,5 @@
 arch==8.0.0
 huggingface-hub==1.11.0
-linearmodels==7.0
 lmdb==2.2.0
 matplotlib==3.10.8
 numba==0.65.0
