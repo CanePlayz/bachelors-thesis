@@ -331,7 +331,7 @@ lines.append(
     r"Attention is $\ln(1 + n_{i,t})$ where $n$ is the daily Reddit mention count; "
     r"Attention (std) is the within-stock z-score. "
     r"Sentiment is the daily average score from the RoBERTa-topic model; "
-    r"Sentiment$^+$ = $\max(S,0)$, Sentiment$^-$ = $\min(S,0)$. "
+    r"Sentiment$^+$ = $\max(S,0)$, Sentiment$^-$ = $\max(-S,0)$. "
     r"``(std)'' denotes global z-scores. "
     r"Valid Sentiment equals 1 if $n_{i,t} \geq 5$. "
     r"Skew.\ and Kurt.\ report Fisher skewness and excess kurtosis. "
